@@ -29,3 +29,7 @@ go.work.sum
 
 # generated layouts
 /out/
+
+# packaging output
+/dist/
+/packaging/windows/build/
