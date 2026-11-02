@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/enxg/TRKEY/internal/emit/keylayout"
 	"github.com/enxg/TRKEY/internal/emit/klc"
 	"github.com/enxg/TRKEY/internal/emit/xkb"
 	"github.com/enxg/TRKEY/internal/layout"
@@ -43,6 +44,20 @@ func main() {
 
 	writeFile(filepath.Join(*outDir, "xkb", "symbols", "trkey"), func(w io.Writer) error {
 		return xkb.Emit(w, keys, *name)
+	})
+
+	bundle := filepath.Join(*outDir, "macos", "TRKEY.bundle", "Contents")
+
+	writeFile(filepath.Join(bundle, "Info.plist"), func(w io.Writer) error {
+		return keylayout.InfoPlist(w, *name)
+	})
+
+	writeFile(filepath.Join(bundle, "Resources", *name+".keylayout"), func(w io.Writer) error {
+		return keylayout.Emit(w, keys, *name)
+	})
+
+	writeFile(filepath.Join(bundle, "Resources", "English.lproj", "InfoPlist.strings"), func(w io.Writer) error {
+		return keylayout.InfoPlistStrings(w, *name)
 	})
 
 	writeFile(filepath.Join(*outDir, "windows", "trkey.klc"), func(w io.Writer) error {
