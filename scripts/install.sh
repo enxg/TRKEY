@@ -131,8 +131,9 @@ linux_install() {
 
 	fetch TRKEY-linux.tar.gz
 	tar -xzf "$tmp/TRKEY-linux.tar.gz" -C "$tmp"
-	[ -f "$tmp/xkb/symbols/trkey" ] && [ -f "$tmp/xkb/rules/evdev.xml" ] ||
+	if [ ! -f "$tmp/xkb/symbols/trkey" ] || [ ! -f "$tmp/xkb/rules/evdev.xml" ]; then
 		die "TRKEY-linux.tar.gz is missing xkb/symbols/trkey or xkb/rules/evdev.xml"
+	fi
 
 	mkdir -p "$xkb_dir/symbols" "$xkb_dir/rules"
 
