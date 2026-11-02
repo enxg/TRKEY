@@ -32,7 +32,7 @@ jobs:
 
       - name: Test install.sh (Linux)
         run: |
-          export TRKEY_BASE_URL="file://$PWD/dist" HOME="$RUNNER_TEMP/home"
+          export TRKEY_BASE_URL="file://$PWD/dist" HOME="$RUNNER_TEMP/home" XDG_CONFIG_HOME="$RUNNER_TEMP/home/.config"
           sh dist/install.sh
           test -f "$HOME/.config/xkb/symbols/trkey"
           grep -q '<name>trkey</name>' "$HOME/.config/xkb/rules/evdev.xml"
@@ -43,7 +43,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends xkb-data x11-xkb-utils
-          export TRKEY_BASE_URL="file://$PWD/dist" HOME="$RUNNER_TEMP/home"
+          export TRKEY_BASE_URL="file://$PWD/dist" HOME="$RUNNER_TEMP/home" XDG_CONFIG_HOME="$RUNNER_TEMP/home/.config"
           sh dist/install.sh --system
           test -f /usr/share/X11/xkb/symbols/trkey
           # compile a full keymap the way an X server would, from the system directory only
