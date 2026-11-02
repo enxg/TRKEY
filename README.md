@@ -5,7 +5,7 @@
 
 ## Windows
 
-1. Download TRKEY-setup.exe from the latest release and run it. It asks for admin rights.
+1. [Download TRKEY-setup.exe from the latest release](https://github.com/enxg/TRKEY/releases/latest/download/TRKEY-setup.exe) and run it. It asks for admin rights.
     - The installer isn't signed, so SmartScreen may say "Windows protected your PC". Click More info → Run anyway.
 2. In the installer, you can tick Also add TRKEY (US) under English (United States). It's unticked by default.
 3. Switch layouts with <kbd>Win</kbd>+<kbd>Space</kbd>. TRKEY is listed under Turkish. If it isn't there yet, sign out and back in
