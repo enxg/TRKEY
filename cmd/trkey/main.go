@@ -46,6 +46,10 @@ func main() {
 		return xkb.Emit(w, keys, *name)
 	})
 
+	writeFile(filepath.Join(*outDir, "xkb", "rules", "evdev.xml"), func(w io.Writer) error {
+		return xkb.Registry(w, *name)
+	})
+
 	bundle := filepath.Join(*outDir, "macos", "TRKEY.bundle", "Contents")
 
 	writeFile(filepath.Join(bundle, "Info.plist"), func(w io.Writer) error {
