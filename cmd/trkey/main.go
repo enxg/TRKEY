@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/enxg/TRKEY/internal/emit/keylayout"
@@ -14,6 +16,8 @@ import (
 	"github.com/enxg/TRKEY/internal/layout"
 )
 
+var versionRe = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
+
 func main() {
 	usPath := flag.String("us", "./us.toml", "base layout")
 	trPath := flag.String("tr", "./tr.toml", "altgr overlay")
@@ -21,10 +25,17 @@ func main() {
 	name := flag.String("name", "TRKEY (US)", "layout display name")
 	company := flag.String("company", "Enes Genç", "company shown by the Windows installer")
 	copyright := flag.String("copyright", "", "copyright shown by the Windows installer")
+	version := flag.String("version", "0.0.0-dev", "release version, major.minor.patch with an optional -suffix")
 	flag.Parse()
 
 	if *copyright == "" {
 		*copyright = fmt.Sprintf("(c) %d %s", time.Now().Year(), *company)
+	}
+
+	// platforms want a plain numeric version; drop any -suffix (0.0.0-dev -> 0.0.0)
+	numVersion, _, _ := strings.Cut(*version, "-")
+	if !versionRe.MatchString(numVersion) {
+		panic(fmt.Sprintf("version %q must look like 1.2.3 or 1.2.3-suffix", *version))
 	}
 
 	us, err := layout.Load(*usPath)
@@ -53,7 +64,7 @@ func main() {
 	bundle := filepath.Join(*outDir, "macos", "TRKEY.bundle", "Contents")
 
 	writeFile(filepath.Join(bundle, "Info.plist"), func(w io.Writer) error {
-		return keylayout.InfoPlist(w, *name)
+		return keylayout.InfoPlist(w, *name, numVersion)
 	})
 
 	writeFile(filepath.Join(bundle, "Resources", *name+".keylayout"), func(w io.Writer) error {
@@ -70,6 +81,7 @@ func main() {
 			Description: *name,
 			Company:     *company,
 			Copyright:   *copyright,
+			Version:     numVersion,
 		})
 	})
 }

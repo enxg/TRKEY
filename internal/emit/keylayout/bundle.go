@@ -7,8 +7,9 @@ import (
 
 const bundleID = "com.github.enxg.trkey"
 
-// InfoPlist writes the bundle's Contents/Info.plist. name must match the .keylayout name.
-func InfoPlist(w io.Writer, name string) error {
+// InfoPlist writes the bundle's Contents/Info.plist. name must match the .keylayout name,
+// version is numeric (major.minor.patch).
+func InfoPlist(w io.Writer, name, version string) error {
 	_, err := fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -18,7 +19,9 @@ func InfoPlist(w io.Writer, name string) error {
 	<key>CFBundleName</key>
 	<string>TRKEY</string>
 	<key>CFBundleVersion</key>
-	<string>1.0</string>
+	<string>%[3]s</string>
+	<key>CFBundleShortVersionString</key>
+	<string>%[3]s</string>
 	<key>KLInfo_%[2]s</key>
 	<dict>
 		<key>TISInputSourceID</key>
@@ -28,7 +31,7 @@ func InfoPlist(w io.Writer, name string) error {
 	</dict>
 </dict>
 </plist>
-`, bundleID, attr(name))
+`, bundleID, attr(name), version)
 	return err
 }
 

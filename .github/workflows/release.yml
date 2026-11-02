@@ -17,8 +17,9 @@ jobs:
 
       - name: Generate layouts
         run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then version="${GITHUB_REF_NAME#v}"; else version=0.0.0-dev; fi
           go vet ./...
-          go run ./cmd/trkey
+          go run ./cmd/trkey -version "$version"
 
       - name: Lint install.sh
         run: shellcheck scripts/install.sh

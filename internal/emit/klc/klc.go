@@ -19,6 +19,7 @@ type Meta struct {
 	Description string
 	Company     string
 	Copyright   string
+	Version     string // major.minor.patch; klc only keeps major.minor
 }
 
 // Emit writes an MSKLC .klc source file (UTF-16LE with BOM, CRLF).
@@ -40,7 +41,11 @@ func Emit(w io.Writer, keys layout.Keys, meta Meta) error {
 	fmt.Fprintf(&b, "COMPANY\t\"%s\"\n\n", meta.Company)
 	b.WriteString("LOCALENAME\t\"tr-TR\"\n\n")
 	b.WriteString("LOCALEID\t\"0000041f\"\n\n")
-	b.WriteString("VERSION\t1.0\n\n")
+	parts := strings.Split(meta.Version, ".")
+	if len(parts) < 2 {
+		return fmt.Errorf("klc: version %q must be major.minor[.patch]", meta.Version)
+	}
+	fmt.Fprintf(&b, "VERSION\t%s.%s\n\n", parts[0], parts[1])
 	b.WriteString(shiftStates)
 
 	b.WriteString("LAYOUT\t\t;an extra '@' at the end is a dead key\n\n")
