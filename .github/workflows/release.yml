@@ -1,0 +1,162 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Generate layouts
+        run: |
+          go vet ./...
+          go run ./cmd/trkey
+
+      - name: Lint install.sh
+        run: shellcheck scripts/install.sh
+
+      - name: Package macOS and Linux
+        run: |
+          mkdir -p dist
+          (cd out/macos && zip -qr ../../dist/TRKEY-macos.zip TRKEY.bundle)
+          tar -C out -czf dist/TRKEY-linux.tar.gz xkb
+          cp scripts/install.sh dist/
+
+      - name: Test install.sh (Linux)
+        run: |
+          export TRKEY_BASE_URL="file://$PWD/dist" HOME="$RUNNER_TEMP/home"
+          sh dist/install.sh
+          test -f "$HOME/.config/xkb/symbols/trkey"
+          grep -q '<name>trkey</name>' "$HOME/.config/xkb/rules/evdev.xml"
+          sh dist/install.sh --uninstall
+          test ! -e "$HOME/.config/xkb/symbols/trkey"
+
+      - name: Test install.sh --system (X11)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends xkb-data x11-xkb-utils
+          export TRKEY_BASE_URL="file://$PWD/dist" HOME="$RUNNER_TEMP/home"
+          sh dist/install.sh --system
+          test -f /usr/share/X11/xkb/symbols/trkey
+          # compile a full keymap the way an X server would, from the system directory only
+          printf '%s\n' 'xkb_keymap {' \
+            '  xkb_keycodes { include "evdev+aliases(qwerty)" };' \
+            '  xkb_types    { include "complete" };' \
+            '  xkb_compat   { include "complete" };' \
+            '  xkb_symbols  { include "pc+trkey+inet(evdev)" };' \
+            '};' > "$RUNNER_TEMP/keymap.xkb"
+          xkbcomp -w 0 "$RUNNER_TEMP/keymap.xkb" "$RUNNER_TEMP/keymap.xkm"
+          sh dist/install.sh --uninstall --system
+          test ! -e /usr/share/X11/xkb/symbols/trkey
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-unix
+          path: dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: klc
+          path: out/windows/trkey.klc
+
+  test-macos:
+    needs: generate
+    runs-on: macos-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-unix
+          path: dist
+
+      - name: Test install.sh (macOS)
+        run: |
+          export TRKEY_BASE_URL="file://$PWD/dist"
+          sh dist/install.sh
+          bundle="$HOME/Library/Keyboard Layouts/TRKEY.bundle"
+          plutil -lint "$bundle/Contents/Info.plist"
+          ls "$bundle/Contents/Resources/"*.keylayout
+          sh dist/install.sh --uninstall
+          test ! -e "$bundle"
+
+  windows:
+    needs: generate
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: klc
+          path: klc
+
+      - name: Get kbdutool (MSKLC 1.4)
+        run: |
+          $exe = "$env:RUNNER_TEMP\MSKLC.exe"
+          Invoke-WebRequest -Uri 'https://download.microsoft.com/download/6/f/5/6f5ce43a-e892-4fd1-b9a6-1a0cbb64e6e2/MSKLC.exe' -OutFile $exe
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
+          if ($hash -ne 'CD12A6B08066133DC4AD71BDCACCF1492E3D9A1DE93CF84B7B2824309F0D7255') { throw "MSKLC.exe hash mismatch: $hash" }
+
+          7z x -y "-o$env:RUNNER_TEMP\msklc" $exe | Out-Null
+
+          # administrative install: unpacks the MSI with its real folder layout, installs nothing
+          $msi = "$env:RUNNER_TEMP\msklc\MSKLC\MSKLC.msi"
+          $target = "$env:RUNNER_TEMP\msklc-files"
+          $p = Start-Process msiexec.exe -ArgumentList "/a `"$msi`" /qn TARGETDIR=`"$target`"" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "msiexec /a failed: $($p.ExitCode)" }
+
+          $kbdutool = Get-ChildItem $target -Recurse -Filter kbdutool.exe | Select-Object -First 1
+          if (-not $kbdutool) { throw 'kbdutool.exe not found in MSKLC' }
+          "KBDUTOOL=$($kbdutool.FullName)" >> $env:GITHUB_ENV
+
+      - name: Build layout DLLs
+        run: |
+          $klc = Resolve-Path klc\trkey.klc
+          foreach ($arch in @(@{ Flag = '-m'; Dir = 'amd64' }, @{ Flag = '-o'; Dir = 'wow64' })) {
+            $dir = "packaging\windows\build\$($arch.Dir)"
+            New-Item -ItemType Directory -Force $dir | Out-Null
+            Push-Location $dir
+            & $env:KBDUTOOL -u -v -w $arch.Flag $klc
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path trkey.dll)) { throw "kbdutool $($arch.Flag) failed" }
+            Pop-Location
+          }
+
+      - name: Build installer
+        run: |
+          choco install innosetup -y --no-progress
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.0.0-dev' }
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" "/O$env:GITHUB_WORKSPACE\dist" packaging\windows\trkey.iss
+          if ($LASTEXITCODE -ne 0) { throw 'ISCC failed' }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows
+          path: dist/
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: [generate, test-macos, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
