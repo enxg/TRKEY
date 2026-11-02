@@ -38,8 +38,8 @@ func Emit(w io.Writer, keys layout.Keys, meta Meta) error {
 	fmt.Fprintf(&b, "KBD\t%s\t\"%s\"\n\n", meta.ID, meta.Description)
 	fmt.Fprintf(&b, "COPYRIGHT\t\"%s\"\n\n", meta.Copyright)
 	fmt.Fprintf(&b, "COMPANY\t\"%s\"\n\n", meta.Company)
-	b.WriteString("LOCALENAME\t\"en-US\"\n\n")
-	b.WriteString("LOCALEID\t\"00000409\"\n\n")
+	b.WriteString("LOCALENAME\t\"tr-TR\"\n\n")
+	b.WriteString("LOCALEID\t\"0000041f\"\n\n")
 	b.WriteString("VERSION\t1.0\n\n")
 	b.WriteString(shiftStates)
 
@@ -56,7 +56,8 @@ func Emit(w io.Writer, keys layout.Keys, meta Meta) error {
 
 	b.WriteString(keyNames)
 	fmt.Fprintf(&b, "DESCRIPTIONS\n\n0409\t%s\n\n", meta.Description)
-	b.WriteString("LANGUAGENAMES\n\n0409\tEnglish (United States)\n\n")
+	// keyed by UI language (0409 = English UI), value is the layout's language name
+	b.WriteString("LANGUAGENAMES\n\n0409\tTurkish (Türkiye)\n\n")
 	b.WriteString("ENDKBD\n")
 
 	return writeUTF16(w, b.String())
